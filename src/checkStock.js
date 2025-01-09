@@ -5,8 +5,9 @@ const nodemailer = require('nodemailer')
 // Configuration
 const URL = 'https://store.steampowered.com/sale/steamdeckrefurbished/'
 const TARGET_TEXT = 'Out of stock'
-const CLASS_NAME = '_3XwnF5hpyOwvxFT_v7PMhS'
+const CLASS_NAME = 'CartBtn'
 const CHECK_INTERVAL = 3600000 // 60 minute in milliseconds
+let itemsInStock
 
 // Email configuration
 const EMAIL_RECEIVER = process.env.EMAIL_SENDER // Sends email to sender
@@ -50,6 +51,7 @@ async function checkStockStatus() {
     ) // Wait for the elements to appear
 
     let statusChanged = false
+    let currentItemsInStock = 0
 
     // Extract the text content of the target elements
     const items = await page.$$(`div.${CLASS_NAME} span`)
@@ -58,12 +60,18 @@ async function checkStockStatus() {
       console.log(spanText)
 
       if (spanText !== TARGET_TEXT) {
-        console.log(
-          `Item status changed: ${spanText} (Not "${TARGET_TEXT}"). Sending email...`
-        )
-        statusChanged = true
+        currentItemsInStock++
       }
     }
+
+    if (itemsInStock && itemsInStock !== currentItemsInStock) {
+      statusChanged = true
+    }
+
+    console.log('Items in stock: ', itemsInStock)
+    console.log('Current items in stock: ', currentItemsInStock)
+
+    itemsInStock = currentItemsInStock
 
     if (statusChanged) {
       await sendEmail()
