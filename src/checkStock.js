@@ -4,13 +4,12 @@ const nodemailer = require('nodemailer')
 
 // Configuration
 const URL = 'https://store.steampowered.com/sale/steamdeckrefurbished/'
-const TARGET_TEXT = 'Out of stock'
-const CLASS_NAME = 'CartBtn'
-const CHECK_INTERVAL = 3600000 // 60 minute in milliseconds
-let itemsInStock
+const CLASS_NAME = 'W9_WAYXgEe-t-7aqqC4Jp'
+const CHECK_INTERVAL = 3600000 // 60 minutes in milliseconds
+let previousContent = []
 
 // Email configuration
-const EMAIL_RECEIVER = process.env.EMAIL_SENDER // Sends email to sender
+const EMAIL_RECEIVER = process.env.EMAIL_SENDER
 
 // Function to send email
 async function sendEmail() {
@@ -28,7 +27,7 @@ async function sendEmail() {
     from: `"Steam Deck Stock Alert" <${process.env.EMAIL_SENDER}>`,
     to: EMAIL_RECEIVER,
     subject: 'Steam Deck Refurbished Status Change',
-    text: `The status of one or more items has changed from "${TARGET_TEXT}". Check the website: ${URL}`,
+    text: `The content of one or more items has changed. Check the website: ${URL}`,
   }
 
   try {
@@ -41,51 +40,46 @@ async function sendEmail() {
 
 // Function to check stock status using Puppeteer
 async function checkStockStatus() {
-  const browser = await puppeteer.launch({ headless: true }) // Launch browser
-  const page = await browser.newPage() // Open a new page
+  const browser = await puppeteer.launch({ headless: true })
+  const page = await browser.newPage()
 
   try {
-    await page.goto(URL, { waitUntil: 'domcontentloaded' }) // Wait for the DOM to be loaded
+    await page.goto(URL, { waitUntil: 'domcontentloaded' })
     await page.waitForFunction(
-      `document.querySelectorAll('div.${CLASS_NAME} span').length >= 5`
-    ) // Wait for the elements to appear
+      `document.querySelectorAll('div.${CLASS_NAME}').length >= 5`
+    )
 
-    let statusChanged = false
-    let currentItemsInStock = 0
+    // Extract the raw HTML content of the target elements
+    const items = await page.$$(`div.${CLASS_NAME}`)
+    const currentContent = []
 
-    // Extract the text content of the target elements
-    const items = await page.$$(`div.${CLASS_NAME} span`)
     for (const item of items) {
-      const spanText = await page.evaluate((el) => el.textContent.trim(), item)
-      console.log(spanText)
-
-      if (spanText !== TARGET_TEXT) {
-        currentItemsInStock++
-      }
+      const html = await page.evaluate((el) => el.outerHTML, item)
+      currentContent.push(html)
     }
 
-    if (itemsInStock && itemsInStock !== currentItemsInStock) {
-      statusChanged = true
-    }
+    console.log('Previous content:', previousContent)
+    console.log('Current content:', currentContent)
 
-    console.log('Items in stock: ', itemsInStock)
-    console.log('Current items in stock: ', currentItemsInStock)
-
-    itemsInStock = currentItemsInStock
-
-    if (statusChanged) {
+    // Check if the content has changed
+    if (
+      previousContent.length > 0 &&
+      JSON.stringify(previousContent) !== JSON.stringify(currentContent)
+    ) {
       await sendEmail()
       return true
-    } else {
-      const currentTime = new Date().toLocaleString()
-      console.log(`[${currentTime}] All items are still out of stock.`)
-      return false
     }
+
+    previousContent = currentContent
+
+    const currentTime = new Date().toLocaleString()
+    console.log(`[${currentTime}] No changes detected.`)
+    return false
   } catch (error) {
     console.error('Error checking the website:', error)
     return false
   } finally {
-    await browser.close() // Close the browser
+    await browser.close()
   }
 }
 
