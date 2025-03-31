@@ -41,7 +41,11 @@ async function sendEmail() {
 
 // Function to check stock status using Puppeteer
 async function checkStockStatus() {
-  const browser = await puppeteer.launch({ headless: true }) // Launch browser
+  // Launch browser
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  })
   const page = await browser.newPage() // Open a new page
 
   try {
